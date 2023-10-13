@@ -17,7 +17,9 @@ enum TokenType {
     NUM,
     STR,
     FUN,
-    WHILE
+    WHILE,
+    IF,
+    BRACKET
 };
 char* codeptr;
 char c;
@@ -69,36 +71,41 @@ int indefOfFirstTokenType(uint8_t type) {
     }
     return -1;
 }
+void storestring() {
+    strbuf[strbufindex++] = 0;
+    //print(strptr);
+    int l = strlen(strptr);
+    if (strptr > &strbuf[0])
+    for (size_t i = 0; i < strbufindex-l-1; i++)
+    {   
+        if (strcmp(&strbuf[i], strptr) == 0) {
+            
+            strptr = &strbuf[i];
+            strbufindex -= l+1;
+            return;
+        }
+    }
+}
 void reset() {
     if (inkw) {
-        strbuf[strbufindex++] = 0;
-        //print(strptr);
         inkw = 0;
-        int l = strlen(strptr);
-        if(strptr>&strbuf[0])
-        for (size_t i = 0; i < strbufindex; i++)
-        {
-            if (strcmp(&strbuf[i], strptr) == 0) {
-                strptr = &strbuf[i];
-                strbufindex -= l ;
-                break;
-            }
-        }
+        storestring();
         pushToken(KWD, strptr);
     }
     else if (innum) {
         numbuf[numbufindex] = 0;
         numbufindex = 0;
         innum = 0;
-        int val = atoi(numbuf);
         pushToken(NUM, (char*)atoi(numbuf));
     }
 }
 int outputsum;
 int tokenIndex;
+bool skiprun = false;
 int getVarMapIndex(char* key) {
     for (size_t i = 0; i < mapIndex; i++)
     {
+        if(strlen(key)==strlen(varMap[i].key))
         if (strcmp(key, varMap[i].key) == 0) {
             return i;
         }
@@ -111,6 +118,7 @@ void functions() {
     tokenStackIndex = funindex;
     int argcount = tokenIndex - (funindex + 1);
     int argindex = funindex + 1;
+    
     if (strcmp(curr_fun, "print") == 0) {
         printf("o: ");
         for (int i = funindex + 1; i < tokenIndex; i++) {
@@ -124,7 +132,7 @@ void functions() {
             }
         }
         printf("\n");
-        pushToken(NUM, (char*)(uint64_t)outputsum);
+        pushToken(NUM, (char*)outputsum);
     }
     else if (strcmp(curr_fun, "add")==0) {
         int mode = 0;
@@ -164,19 +172,60 @@ void functions() {
                 
             }
         }
-        pushToken(NUM, (char*)(uint64_t)outputsum);
+        pushToken(NUM, (char*)outputsum);
+    }
+    else if (strcmp(curr_fun, "sub")==0) {
+        int mode = 0;
+        outputsum = *((int*)&tokenStack[argindex].data);
+        for (int i = argindex+1; i < tokenIndex; i++) {
+            if (tokenStack[i].type == STR)
+            {
+                 
+            }
+            else if (tokenStack[i].type == NUM)
+            {
+                
+                if (mode == NUM) 
+                {
+                   outputsum -= *((int*)&tokenStack[i].data); 
+                }
+                else if (mode == 0) 
+                {
+                    outputsum -= *((int*)&tokenStack[i].data);
+                    mode = NUM;
+                }
+                else if (mode == STR) 
+                {
+
+                }
+                
+            }
+        }
+        pushToken(NUM, (char*)(int)outputsum);
     }
     else if (strcmp(curr_fun, "set") == 0) {
         if (argcount == 2) {
-            if (tokenStack[argindex].type == STR) {
-                int i = getVarMapIndex(tokenStack[argindex].data);
-                if (i == -1) {
-                    varMap[mapIndex++] = { strptr,tokenStack[argindex] };
-                }
+            int i = getVarMapIndex(tokenStack[argindex].data);
+            if (i == -1) {
+                i = mapIndex++;
+                varMap[i] = { tokenStack[argindex].data,tokenStack[argindex+1] };
+            }
+            else {
+                varMap[i].val = tokenStack[argindex+1];
+            }
+            pushToken(varMap[i].val.type, varMap[i].val.data);
+        }
+    }
+    else if (strcmp(curr_fun, "get") == 0) {
+        if (argcount == 1) {
+            int i = getVarMapIndex(tokenStack[argindex].data);
+            if (i != -1) {
+                pushToken(varMap[i].val.type, varMap[i].val.data);
             }
         }
     }
 }
+char* kwdstart = 0;
 void runcode(const char* code) {
     print(code);
     codeptr = (char*)code;
@@ -185,20 +234,29 @@ void runcode(const char* code) {
     inkw = 0;
     tokenStackIndex = 0;
     strbufindex = 0;
+    mapIndex = 0;
     while (c != 0) {
         c = *codeptr++;
         if (c == 0)continue;
         if (c == '(') {
             reset();
             if (lasttokentype == KWD) {
-                if (strcmp(lasttokendata, "while")==0) {
+                if (strcmp(lasttokendata, "while") == 0) {
                     tokenStack[tokenStackIndex - 1].type = WHILE;
-                    tokenStack[tokenStackIndex - 1].data = codeptr;
+                    tokenStack[tokenStackIndex - 1].data = kwdstart;
+                }
+                else if (strcmp(lasttokendata, "if") == 0) {
+                    tokenStack[tokenStackIndex - 1].type = IF;
+                    tokenStack[tokenStackIndex - 1].data = kwdstart;
                 }
                 else {
-                    printf("funcall %s\n", lasttokendata);
+                    //printf("funcall %s\n", lasttokendata);
                     tokenStack[tokenStackIndex - 1].type = FUN;
                 }
+            }
+            else {
+                pushToken(BRACKET, codeptr);
+                printf("don't know what to do with %d\n", lasttokentype);
             }
         }
         else if (c == ',') {
@@ -208,19 +266,25 @@ void runcode(const char* code) {
         else if (c == ')') {
             reset();
 
-            //int whileindex = indefOfFirstTokenType(WHILE);
-            //if (whileindex > funindex) {
-            //    tokenStackIndex = whileindex;
-                
-            //}
-            //else {
-            funindex = indefOfFirstTokenType(FUN);
-            if (funindex == ((uint8_t)-1)) {
-                printf("funcall not found!");
+            for (int i = tokenStackIndex-1; i >= 0; i--)
+            {
+                if (tokenStack[i].type == FUN) {
+                    curr_fun = tokenStack[i].data;
+                    funindex = i;
+                    if (!skiprun)
+                        functions();
+                    break;
+                }
+                else if (tokenStack[i].type==IF) {
+                    skiprun = tokenStack[tokenStackIndex - 1].data == 0;
+                    break;
+                }
+                else if (tokenStack[i].type == WHILE) {
+                    skiprun = tokenStack[tokenStackIndex - 1].data == 0;
+                    break;
+                }
             }
-            curr_fun = tokenStack[funindex].data;
-            functions();
-            //}
+            
             //printf("arg count %d \n",argCounter);
         }
         else if (c == '{') {
@@ -228,6 +292,22 @@ void runcode(const char* code) {
         }
         else if (c == '}') {
 
+        }
+        else if (c == ';') {
+            if (skiprun) {
+                skiprun = false;
+            }
+            else {
+                auto tok = tokenStack[tokenStackIndex - 1];
+                for (int i = tokenStackIndex - 1; i >= 0; i--)
+                {
+                    if (tokenStack[i].type == WHILE) {
+                        codeptr = tokenStack[i].data;
+                        tokenStackIndex = i;
+                        break;
+                    }
+                }
+            }
         }
         else if (c == '\'') {
             reset();
@@ -238,10 +318,11 @@ void runcode(const char* code) {
                 strbuf[strbufindex++] = c;
                 c = *codeptr++;
             }
-            strbuf[strbufindex++] = 0;
+            //strbuf[strbufindex++] = 0;
+            storestring();
             //c = *codeptr++;
-            printf("str: %s\n", strptr);
-
+            //printf("str: %s\n", strptr);
+            
             pushToken(STR, strptr);
             //argsarray[argscounter]=strptr;
             //argscounter+=1;
@@ -258,6 +339,7 @@ void runcode(const char* code) {
         else {
             if (!inkw) {
                 inkw = 1;
+                kwdstart = codeptr - 1;
                 strptr = strbuf + strbufindex;
             }
             strbuf[strbufindex++] = c;
