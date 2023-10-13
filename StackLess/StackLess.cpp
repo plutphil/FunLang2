@@ -203,6 +203,19 @@ void functions() {
         }
         pushToken(NUM, (char*)(int)outputsum);
     }
+    else if (strcmp(curr_fun, "gt") == 0) {
+        if (argcount == 2) {
+            int a = *((int*)&tokenStack[argindex].data);
+            int b = *((int*)&tokenStack[argindex + 1].data);
+            int res = a < b;
+            pushToken
+            (
+                NUM, 
+                (char*)res
+            );
+            //printf("top %ld", tokenStack[tokenStackIndex - 1].data);
+        }
+    }
     else if (strcmp(curr_fun, "set") == 0) {
         if (argcount == 2) {
             int i = getVarMapIndex(tokenStack[argindex].data);
@@ -226,6 +239,7 @@ void functions() {
     }
 }
 char* kwdstart = 0;
+int maxwhilecounter = 50;
 void runcode(const char* code) {
     print(code);
     codeptr = (char*)code;
@@ -281,6 +295,7 @@ void runcode(const char* code) {
                 }
                 else if (tokenStack[i].type == WHILE) {
                     skiprun = tokenStack[tokenStackIndex - 1].data == 0;
+                    if (skiprun)tokenStackIndex = i - 1;
                     break;
                 }
             }
@@ -302,7 +317,11 @@ void runcode(const char* code) {
                 for (int i = tokenStackIndex - 1; i >= 0; i--)
                 {
                     if (tokenStack[i].type == WHILE) {
+                        
+                        maxwhilecounter--;
+                        if(maxwhilecounter>0)
                         codeptr = tokenStack[i].data;
+                        
                         tokenStackIndex = i;
                         break;
                     }
