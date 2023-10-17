@@ -218,22 +218,26 @@ void functions() {
     }
     else if (strcmp(curr_fun, "set") == 0) {
         if (argcount == 2) {
-            int i = getVarMapIndex(tokenStack[argindex].data);
-            if (i == -1) {
-                i = mapIndex++;
-                varMap[i] = { tokenStack[argindex].data,tokenStack[argindex+1] };
+            if (tokenStack[argindex].type == KWD || tokenStack[argindex].type == STR) {
+                int i = getVarMapIndex(tokenStack[argindex].data);
+                if (i == -1) {
+                    i = mapIndex++;
+                    varMap[i] = { tokenStack[argindex].data,tokenStack[argindex + 1] };
+                }
+                else {
+                    varMap[i].val = tokenStack[argindex + 1];
+                }
+                pushToken(varMap[i].val.type, varMap[i].val.data);
             }
-            else {
-                varMap[i].val = tokenStack[argindex+1];
-            }
-            pushToken(varMap[i].val.type, varMap[i].val.data);
         }
     }
     else if (strcmp(curr_fun, "get") == 0) {
         if (argcount == 1) {
-            int i = getVarMapIndex(tokenStack[argindex].data);
-            if (i != -1) {
-                pushToken(varMap[i].val.type, varMap[i].val.data);
+            if (tokenStack[argindex].type == KWD || tokenStack[argindex].type == STR) {
+                int i = getVarMapIndex(tokenStack[argindex].data);
+                if (i != -1) {
+                    pushToken(varMap[i].val.type, varMap[i].val.data);
+                }
             }
         }
     }

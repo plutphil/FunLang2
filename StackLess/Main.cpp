@@ -36,6 +36,7 @@ int main()
         ";"
 
     );
+    runcode("set(kw,10)print(get(kw))");
 
 
     //print("Hello World!");
